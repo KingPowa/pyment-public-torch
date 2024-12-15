@@ -4,7 +4,7 @@ from typing import Callable, Union
 from collections import OrderedDict
 from abc import abstractmethod
 
-from utils.nn_utils import get_activation, Conv3DSame
+from .utils.nn_utils import get_activation, Conv3DSame
 from .base_model import BaseModel
 
 class SFCN(BaseModel):

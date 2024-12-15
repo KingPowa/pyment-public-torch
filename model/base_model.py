@@ -3,7 +3,7 @@ import os
 import numpy as np
 import torch.nn as nn
 
-from .utils import WeightRepository
+from .utils.etc import WeightRepository
 
 class BaseModel(nn.Module):
     """ A model wrapper on top of the default keras Model class.

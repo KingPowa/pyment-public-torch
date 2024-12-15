@@ -105,7 +105,7 @@ class WeightRepository:
 
     @staticmethod
     def convert_to_torch(weights_path: str, model_state_dictionary: dict, model_type: str = "sfcn-reg", model_name: str = "Regression3DSFCN") -> OrderedDict[str, np.ndarray]:
-        weight_dictionary = WeightRepository.__load_tf_weights(weights_path, model_name)
+        weight_dictionary = WeightRepository.load_tf_weights(weights_path, model_name)
         # Translate it
 
         weight_dictionary = WeightRepository.__translate_tf_weights(tf_weights=weight_dictionary, state_dictionary=model_state_dictionary,
@@ -114,7 +114,7 @@ class WeightRepository:
 
 
     @staticmethod
-    def __load_tf_weights(weights_path: str, model_name: str = "Regression3DSFCN") -> OrderedDict[str, np.ndarray]:
+    def load_tf_weights(weights_path: str, model_name: str = "Regression3DSFCN") -> OrderedDict[str, np.ndarray]:
         ordering = {
             "conv": ("kernel:0", "bias:0"),
             "norm": ("gamma:0", "beta:0", "moving_mean:0", "moving_variance:0"),
