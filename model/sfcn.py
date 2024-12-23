@@ -4,7 +4,7 @@ from typing import Callable, Union
 from collections import OrderedDict
 from abc import abstractmethod
 
-from .utils.nn_utils import get_activation, Conv3DSame
+from .utils.nn_utils import get_activation, Conv3DSame, MaxPool3dIndices
 from .base_model import BaseModel
 
 class SFCN(BaseModel):
@@ -80,7 +80,7 @@ class SFCN(BaseModel):
                 )
             channel_dict[f'{block_name}_norm'] = nn.BatchNorm3d(out_channels, eps=self.eps)
             channel_dict[f'{block_name}_{activation}'] = get_activation(activation)
-            channel_dict[f'{block_name}_pool'] = nn.MaxPool3d(kernel_size=2, stride=2)
+            channel_dict[f'{block_name}_pool'] = MaxPool3dIndices(kernel_size=2, stride=2)
 
             curr_filters=filters[i]
 
