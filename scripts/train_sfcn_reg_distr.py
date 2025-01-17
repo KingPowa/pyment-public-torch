@@ -56,11 +56,14 @@ def main(config_file: str):
                                             monitor='val_loss',
                                             mode='min')
     logger.info(f"Setting up Trainer")
+    logger.info(f"TRAINING INFO")
+    logger.info(f"-- Devices {torch.cuda.device_count()}")
+    logger.info(f"-- Slurm {session.is_slurm()}")
+    logger.info(f"-- Accelerator {session.accelerator}")
     trainer = Trainer(
-        accelerator="gpu",
+        accelerator=session.accelerator,
         devices=torch.cuda.device_count(),  # Automatically detect available GPUs
-        num_nodes=int(os.getenv("SLURM_NNODES", 1)),  # Number of nodes
-        strategy=DDPStrategy(find_unused_parameters=False), 
+        num_nodes=session.config.num_nodes,  # Number of nodes
         max_epochs=session.config.train_config.epochs,
         logger=wand_logger,
         callbacks=[checkpoint_callback],
