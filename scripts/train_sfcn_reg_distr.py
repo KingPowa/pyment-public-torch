@@ -46,7 +46,7 @@ def main(config_file: str):
                                        transforms=[Resize3D(IMG_SHAPE, "trilinear")]) 
     # Setup Model
     logger.info(f"Declaring SFCN model...")
-    model = SFCNModule(RegressionSFCN(prediction_range=AGE_RANGE), learning_rate=config.train_config.l)
+    model = SFCNModule(RegressionSFCN(prediction_range=AGE_RANGE), learning_rate=config.train_config.lr)
     # Setup Training
     logger.info(f"Starting training. Number of epochs: {config.train_config.epochs}")
     logger.info(f"Setting up Wandbboard")
