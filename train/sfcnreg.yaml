@@ -9,6 +9,7 @@ train_config:
   img_shape: [168, 192, 160]
   devices: 2
   accelerator: "gpu"
+  learning_rate: 0.001
 
 datasets:
   - _target_: datasets.file_based.LMDBDataset
