@@ -33,16 +33,7 @@ class SFCN(BaseModel):
                  eps: float = 0.001,
                  name: str = 'sfcn',
                  **kwargs):
-        """
-        Args:
-            input_shape (tuple): Input shape of the tensor (C, D, H, W).
-            pooling (str): Pooling type ('avg' or 'max').
-            include_top (bool): If True, include a prediction head.
-            dropout (float): Dropout rate.
-            weight_decay: Control the regularisation of Conv3D.
-            activation (str): Activation function ('relu', 'tanh', etc.).
-            filters (list): Custom filter sizes for each block.
-        """
+        
         super(SFCN, self).__init__()
 
         self.include_top = include_top

@@ -1,0 +1,44 @@
+defaults:
+  - _self_
+
+train_config:
+  base_dir: "SFCN_workdir"
+  batch_size: 16
+  epochs: 80
+  age_range: [0, 100]
+  img_shape: [168, 192, 160]
+  devices: 2
+  accelerator: "gpu"
+
+datasets:
+  - _target_: datasets.file_based.LMDBDataset
+    config:
+      _target_: configuration.files.LMDBDatasetConfig
+      lmdb_folder : "/Users/kingpowa/Documents/Programming/test_data/IXI/lmdb"
+      is_volume : True
+      modality : "T1w"
+      name: "IXI Dataset"
+      mtransforms :
+        - _target_: utils.transforms.Cropper
+          target_size: [192, 160]
+  - _target_: datasets.file_based.LMDBDataset
+    config:
+      _target_: configuration.files.LMDBDatasetConfig
+      lmdb_folder : "/Users/kingpowa/Documents/Programming/test_data/IXI/lmdb"
+      is_volume : True
+      modality : "T1w"
+      name: "IXI Dataset"
+      mtransforms :
+        - _target_: utils.transforms.Cropper
+          target_size: [192, 160]
+  - _target_: datasets.file_based.LMDBDataset
+    config:
+      _target_: configuration.files.LMDBDatasetConfig
+      lmdb_folder : "/Users/kingpowa/Documents/Programming/test_data/IXI/lmdb"
+      is_volume : True
+      modality : "T1w"
+      name: "IXI Dataset"
+      mtransforms :
+        - _target_: utils.transforms.Cropper
+          target_size: [192, 160]
+
