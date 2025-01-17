@@ -10,6 +10,7 @@ sys.path.append(parent_dir)
 
 from omegaconf import OmegaConf
 from pytorch_lightning import Trainer
+from pytorch_lightning.strategies import DDPStrategy
 
 from configuration.files import LMDBDatasetConfig
 from utils.transforms import Cropper, Resize3D
@@ -55,9 +56,11 @@ def main(config_file: str):
                                             mode='min')
     logger.info(f"Setting up Trainer")
     trainer = Trainer(
+        accelerator="gpu",
+        devices=torch.cuda.device_count(),  # Automatically detect available GPUs
+        num_nodes=int(os.getenv("SLURM_NNODES", 1)),  # Number of nodes
+        strategy=DDPStrategy(find_unused_parameters=False), 
         max_epochs=session.config.train_config.epochs,
-        devices=session.devices,
-        accelerator=session.accelerator,
         logger=wand_logger,
         callbacks=[checkpoint_callback],
         enable_progress_bar=(not session.is_slurm())
