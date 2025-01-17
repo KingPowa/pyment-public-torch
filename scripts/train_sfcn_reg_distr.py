@@ -11,6 +11,7 @@ sys.path.append(parent_dir)
 from omegaconf import OmegaConf
 from pytorch_lightning import Trainer
 from pytorch_lightning.strategies import DDPStrategy
+from pytorch_lightning.tuner import Tuner
 
 from configuration.files import LMDBDatasetConfig
 from utils.transforms import Cropper, Resize3D
@@ -65,6 +66,14 @@ def main(config_file: str):
         callbacks=[checkpoint_callback],
         enable_progress_bar=(not session.is_slurm())
     )
+    tuner = Tuner(trainer)
+    lr_finder = tuner.lr_find(model)
+    fig = lr_finder.plot(suggest=True)
+    fig.savefig(os.path.join(session.fig_dir, "lr_tuner.png"))
+
+    # Update the model's learning rate
+    new_lr = lr_finder.suggestion()
+    model.hparams.learning_rate = new_lr
 
     logger.info(f"Starting trainer")
     trainer.fit(model, datamodule=dataloader)

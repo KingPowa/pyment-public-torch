@@ -31,6 +31,12 @@ class Session:
         os.makedirs(ckdir, exist_ok=True)
         return ckdir
     
+    @property 
+    def fig_dir(self):
+        fig_dir = os.path.join(self.working_directory, "figs")
+        os.makedirs(fig_dir, exist_ok=True)
+        return fig_dir
+    
     def __get_ckpt_dir(self):
         return (self.config.train_config.chkpt_dir if "chkpt_dir" in self.config.train_config.keys() else "checkpoints")
     

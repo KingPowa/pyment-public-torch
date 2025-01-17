@@ -19,6 +19,7 @@ class SFCNModule(pl.LightningModule):
         self.learning_rate = learning_rate
         self.criterion = criterion
         self.optimizer = optimizer
+        self.save_hyperparameters()
 
     def forward(self, x):
         return self.model(x)
@@ -45,7 +46,7 @@ class SFCNModule(pl.LightningModule):
         return loss
 
     def __get_opt(self, opt):
-        if opt == "sgd": return optim.SGD(self.model.parameters(), lr=self.learning_rate)
+        if opt == "sgd": return optim.SGD(self.model.parameters(), lr=self.hparams.learning_rate)
         else: raise NotImplementedError(f"Optimizer {opt} not supported.")
 
     def configure_optimizers(self):
@@ -54,7 +55,7 @@ class SFCNModule(pl.LightningModule):
         - Initial learning rate: self.learning_rate
         - Step-wise reduction by factor of 3 at epochs [20, 40, 60]
         """
-        optimizer = self.__get_opt(self.optimizer)
+        optimizer = self.__get_opt(self.hparams.optimizer)
         scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20, 40, 60], gamma=1/3)
 
         return {"optimizer": optimizer, "lr_scheduler": scheduler}
