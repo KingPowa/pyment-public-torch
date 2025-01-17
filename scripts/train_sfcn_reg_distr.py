@@ -65,6 +65,7 @@ def main(config_file: str):
         devices=torch.cuda.device_count(),  # Automatically detect available GPUs
         num_nodes=session.config.num_nodes,  # Number of nodes
         max_epochs=session.config.train_config.epochs,
+        strategy=DDPStrategy(find_unused_parameters=False),
         logger=wand_logger,
         callbacks=[checkpoint_callback],
         enable_progress_bar=(not session.is_slurm())
