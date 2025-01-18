@@ -21,8 +21,8 @@ class MRIDataset(Dataset):
 
         self.age_range = None
         
-        self.dataset = dataset if not is_iterable(dataset) else ConcatDataset(dataset)
-        self.length = len(dataset)
+        self.dataset = dataset if not is_iterable(dataset, cls=MedicalDataset) else ConcatDataset(dataset)
+        self.length = len(self.dataset)
         self.mtransforms = tr.Compose(transforms) if transforms else torch.nn.Identity()
 
     def __len__(self):

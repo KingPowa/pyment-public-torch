@@ -159,10 +159,10 @@ def get_activation(activation: str) -> nn.Module:
     if activation == "relu": return Relu()
     if activation == "sigmoid": return Sigmoid()
 
-def is_iterable(the_element):
+def is_iterable(the_element, cls=None):
     try:
         iter(the_element)
     except TypeError:
         return False
     else:
-        return True
+        return True if cls is None else not isinstance(the_element, cls)

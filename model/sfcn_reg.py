@@ -10,7 +10,7 @@ from .sfcn import SFCN
 class RegressionSFCN(SFCN):
 
     def prediction_head(self, x: torch.Tensor) -> torch.Tensor:
-        x = x.view((1, -1))
+        x = x.view((x.shape[0], -1))
         x = self.linear(x)
         if self.prediction_range:
             x = x.clamp(0, self.upper-self.lower)
