@@ -3,11 +3,17 @@ from logging import Logger
 from datasets.file_based import MedicalDataset
 import hydra
 
-def instantiate_datasets(datasets: ListConfig[DictConfig], logger: Logger):
+def instantiate_datasets(datasets: ListConfig[DictConfig], logger: Logger = None):
     inst_datasets = []
-    logger.info("Selected datasets:")
+    if logger:
+        logger.info("Selected datasets:")
+    else:
+        print("Selected datasets:")
     for dataset in datasets:
         inst_dataset: MedicalDataset = hydra.utils.instantiate(dataset)
         inst_datasets.append(inst_dataset)
-        logger.info(f"-- {inst_dataset.get_name()} (Location: {inst_dataset.get_location()})")
+        if logger:
+            logger.info(f"-- {inst_dataset.get_name()} (Location: {inst_dataset.get_location()})")
+        else:
+            print(f"-- {inst_dataset.get_name()} (Location: {inst_dataset.get_location()})")
     return inst_datasets

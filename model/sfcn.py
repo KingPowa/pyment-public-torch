@@ -29,7 +29,6 @@ class SFCN(BaseModel):
                  weight_decay: float = 0.0,
                  activation: Union[str, nn.Module] = 'relu',
                  filters: list[int] = FILTERS,
-                 weights: str = None,
                  eps: float = 0.001,
                  name: str = 'sfcn',
                  **kwargs):

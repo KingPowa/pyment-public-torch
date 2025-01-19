@@ -2,6 +2,7 @@ import os
 import logging
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.utilities import rank_zero_only
 from omegaconf import DictConfig
 
 from utils.etc import get_timestamp
@@ -51,9 +52,39 @@ class Session:
     def is_slurm(self):
         return 'SLURM_JOB_ID' in os.environ
 
-def setup_logger(session: Session, level=logging.INFO):
-    """Set up a basic logger with timestamp."""
-    logger = logging.getLogger(f"{session.name}_Logger")
+class RankZeroLogger(logging.Logger):
+    """Logger that only logs messages on rank 0 in distributed training."""
+
+    @rank_zero_only
+    def info(self, msg, *args, **kwargs):
+        super().info(msg, *args, **kwargs)
+
+    @rank_zero_only
+    def warning(self, msg, *args, **kwargs):
+        super().warning(msg, *args, **kwargs)
+
+    @rank_zero_only
+    def error(self, msg, *args, **kwargs):
+        super().error(msg, *args, **kwargs)
+
+    @rank_zero_only
+    def debug(self, msg, *args, **kwargs):
+        super().debug(msg, *args, **kwargs)
+
+    @rank_zero_only
+    def critical(self, msg, *args, **kwargs):
+        super().critical(msg, *args, **kwargs)
+
+def setup_logger(session: Session, level=logging.INFO) -> RankZeroLogger:
+    """Set up a rank-zero logger with timestamp, ensuring singleton behavior."""
+
+    logger_name = f"{session.name}_Logger"
+    
+    # Check if logger already exists
+    if logger_name in logging.root.manager.loggerDict:
+        return logging.getLogger(logger_name)  # Return existing instance
+
+    logger = RankZeroLogger(logger_name)
     logger.setLevel(level)
 
     # Create a file handler to log to a file
