@@ -7,7 +7,7 @@ from logging import Logger
 from .sfcn import SFCN
 
 class SFCNModule(pl.LightningModule):
-    def __init__(self, model: SFCN, learning_rate=0.1, optimizer = "sgd", criterion = nn.MSELoss(), pers_logger: Logger = None):
+    def __init__(self, model: SFCN, learning_rate=0.1, optimizer = "sgd", criterion = nn.MSELoss(), pers_logger: Logger = None, max_epochs = 80, decay = 1/3, milestones = 5):
         """
         PyTorch Lightning module to train SFCN
         
@@ -21,6 +21,9 @@ class SFCNModule(pl.LightningModule):
         self.criterion = criterion
         self.optimizer = optimizer
         self.pers_logger = pers_logger
+        self.max_epochs = max_epochs
+        self.decay = decay
+        self.milestones = milestones
         self.save_hyperparameters(ignore=["model", "criterion", "pers_logger"])
 
     def forward(self, x):
@@ -75,6 +78,6 @@ class SFCNModule(pl.LightningModule):
         - Step-wise reduction by factor of 3 at epochs [20, 40, 60]
         """
         optimizer = self.__get_opt(self.hparams.optimizer)
-        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20, 40, 60], gamma=1/3)
+        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[i * (self.max_epochs // self.milestones) for i in range(1, self.milestones+1)], gamma=self.decay)
 
         return {"optimizer": optimizer, "lr_scheduler": scheduler}

@@ -3,6 +3,7 @@ import torch
 import sys
 import os
 import hydra
+import optuna
 
 # Add the parent directory to the sys.path
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -14,11 +15,9 @@ from pytorch_lightning.strategies import DDPStrategy
 from pytorch_lightning.tuner import Tuner
 from pytorch_lightning.callbacks import EarlyStopping
 
-from configuration.files import LMDBDatasetConfig
-from utils.transforms import Cropper, Resize3D
+from utils.transforms import Resize3D
+from utils.sbatch_utils import query_lr
 from utils.logging_tools import setup_logger, Session, AdvancedModelCheckpoint, AdvancedWandLogger
-from datasets.file_based import LMDBDataset
-from datasets.mri import MRIDataset
 from datasets.utils import instantiate_datasets
 from dataloaders.mri import MRIHoldoutDataLoader
 
@@ -32,8 +31,6 @@ def main(config_file: str):
     config = OmegaConf.load(CONFIG_PATH)
     # Setup Session
     session = Session("SFCN_training", config=config)
-    # Setup directory
-    working_directory = session.working_directory
     # Setup Logger
     logger = setup_logger(session)
     # Setup training vars
@@ -47,7 +44,18 @@ def main(config_file: str):
                                        transforms=[Resize3D(IMG_SHAPE, "trilinear")]) 
     # Setup Model
     logger.info(f"Declaring SFCN model...")
-    model = SFCNModule(RegressionSFCN(prediction_range=AGE_RANGE), learning_rate=config.train_config.lr, pers_logger=logger)
+
+    # Querying LR from env
+    lr = query_lr()
+    if lr is not None:
+        logger.info(f"Learning rate passed from env: {lr}")
+    else:
+        logger.info(f"Using default learning rate passed from config: {config.train_config.lr}")
+        lr = config.train_config.lr
+
+    model = SFCNModule(RegressionSFCN(prediction_range=AGE_RANGE), learning_rate=lr, pers_logger=logger,
+                       milestones=config.train_config.milestones, decay=config.train_config.decay,
+                       max_epochs=session.config.train_config.epochs)
     # Setup Training
     logger.info(f"Starting training. Number of epochs: {config.train_config.epochs}")
     logger.info(f"Setting up Wandbboard")
@@ -77,15 +85,6 @@ def main(config_file: str):
         callbacks=[checkpoint_callback, early_stop_callback],
         enable_progress_bar=(not session.is_slurm())
     )
-    tuner = Tuner(trainer)
-    lr_finder = tuner.lr_find(model)
-    fig = lr_finder.plot(suggest=True)
-    fig.savefig(os.path.join(session.fig_dir, "lr_tuner.png"))
-
-    # Update the model's learning rate
-    new_lr = lr_finder.suggestion()
-    model.hparams.learning_rate = new_lr
-    logger.info(f"Using suggested LR: {new_lr}")
 
     logger.info(f"Starting trainer")
     trainer.fit(model, datamodule=dataloader)

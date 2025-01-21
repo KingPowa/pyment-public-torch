@@ -61,13 +61,19 @@ class MRIHoldoutDataLoader(MRIDataloader):
             self.valid_set, self.test_set = random_split(valid_set, [self.hparams.val_holdout, 1-self.hparams.val_holdout])
 
     def train_dataloader(self):
+        if not self.train_set:
+            self.setup()
         return DataLoader(self.train_set, num_workers=self.hparams.num_workers, batch_size=self.hparams.batch_size,
                           shuffle=True, generator=Generator().manual_seed(self.hparams.seed))
 
     def val_dataloader(self):
+        if not self.valid_set:
+            self.setup()
         return DataLoader(self.valid_set, num_workers=self.hparams.num_workers, batch_size=self.hparams.batch_size)
 
     def test_dataloader(self):
+        if not self.test_set:
+            self.setup()
         return DataLoader(self.test_set, num_workers=self.hparams.num_workers, batch_size=self.hparams.batch_size)
     
 class MRIKFoldDataLoader(MRIDataloader):
