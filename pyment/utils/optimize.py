@@ -126,7 +126,9 @@ class OptimizerConfiguration:
 def instantiate_optim_config(config: DictConfig) -> dict[str, OptimizerConfiguration]:
     return {
         key: instantiate(elem) for key, elem in config.optuna_config.items() 
-        if ("_target_" in elem and "OptimizerConfiguration" in elem._target_)
+        if (isinstance(elem, dict) and
+            "_target_" in elem.keys() and
+            "OptimizerConfiguration" in elem._target_)
     }
 
 class Optimizer():
@@ -154,14 +156,18 @@ class Optimizer():
         self.model_class = model_class
         self.session = session
 
-    def __register_parameters(arg_dict: dict[str, Any], 
+        self.storage = optuna.storages.RDBStorage(f"sqlite:///{session.base_dir}/{session.name}.db")
+
+    def __register_parameters(self,
+                              arg_dict: dict[str, Any], 
                               suggested_parameters: dict[str, dict[str, Any]], 
                               key: str):
         if key in suggested_parameters:
             for param, val in suggested_parameters[key].items():
                 arg_dict[param] = val # Register parameter in dict
 
-    def __register_config(trial: optuna.trial.Trial, 
+    def __register_config(self,
+                          trial: optuna.trial.Trial, 
                           config: dict[str, OptimizerConfiguration]) -> dict[str, dict[str, Any]]:
         hyperparameters = {key: {} for key in config.keys()}
         for key, opt_config in config.items():
@@ -185,27 +191,26 @@ class Optimizer():
 
             # Create a new session
             trial_session = Session(f"Trial_{trial.number}_{self.session.name}",
-                                    config = {
+                                    config = DictConfig({
                                         "train_config": {
                                             "base_dir": self.session.working_directory
                                         }
-                                    })
+                                    }))
 
-            wand_logger = AdvancedWandLogger(model, trial_session, offline=True)
+            model: SFCN = self.model_class(**model_args)
+            trainable: SFCNModule = SFCNModule(model=model, 
+                                               pers_logger=self.logger,
+                                               **trainable_args)
 
+            wand_logger = AdvancedWandLogger(model, trial_session, log_model=False)
             checkpoint_callback = AdvancedModelCheckpoint(session=trial_session,
                                             filename_suffix='holdout',
                                             monitor='val_loss',
                                             mode='min')
-            
             pruning_callback = PyTorchLightningPruningCallback(trial, 
                                                     monitor=self.monitor_metric)
-
             callbacks = self.callbacks + [pruning_callback,
                                           checkpoint_callback]
-
-            model: SFCN = self.model_class(**model_args)
-            trainable: SFCNModule = SFCNModule(model=model, **trainable_args) 
             trainer = Trainer(callbacks=callbacks, 
                               logger=wand_logger,
                               **trainer_args)
@@ -220,10 +225,14 @@ class Optimizer():
             performances = trainer.callback_metrics
             self.logger.info(f"Finished. Total performance: {performances}")
 
+            pruning_callback.check_pruned()
+
             return trainer.callback_metrics[self.monitor_metric].item()
 
         pruner = optuna.pruners.MedianPruner()
-        study = optuna.create_study(direction=direction, pruner=pruner)
+        study = optuna.create_study(direction=direction, 
+                                    storage=self.storage,
+                                    pruner=pruner)
         self.logger.info("## Starting optimization ##")
         study.optimize(objective, n_trials=n_trials, timeout=timeout)
 

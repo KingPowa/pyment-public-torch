@@ -60,14 +60,13 @@ def main(config_file: str):
     trainer_args = {
         "accelerator" : session.accelerator,
         "devices" : torch.cuda.device_count(),  # Automatically detect available GPUs
-        "num_nodes" : session.config.train_config.num_nodes,  # Number of nodes
+        "num_nodes" : session.config.slurm_config.num_nodes,  # Number of nodes
         "max_epochs" : session.config.train_config.epochs,
         "strategy" : DDPStrategy(find_unused_parameters=False),
         "enable_progress_bar" : (not session.is_slurm())
     }
     trainable_args = {
-        "pers_logger" : logger,
-        "learning_rate" : config.trainable_config.lr,
+        "lr" : config.trainable_config.lr,
         "momentum" : config.trainable_config.momentum,
         "milestones" : config.trainable_config.milestones,
         "weight_decay" : config.trainable_config.weight_decay

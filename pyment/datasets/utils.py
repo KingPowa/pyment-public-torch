@@ -1,6 +1,6 @@
 from omegaconf import ListConfig, DictConfig
 from logging import Logger
-from datasets.file_based import MedicalDataset
+from .file_based import MedicalDataset
 import hydra
 
 def instantiate_datasets(datasets: ListConfig[DictConfig], logger: Logger = None):

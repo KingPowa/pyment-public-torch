@@ -11,7 +11,8 @@ class Session:
 
     def __init__(self, name: str, config: DictConfig):
         self.session_identifier = get_timestamp()
-        self.working_directory = os.path.join(config.train_config.base_dir, f"{name}_exec_{self.session_identifier}")
+        self.base_dir = config.train_config.base_dir
+        self.working_directory = os.path.join(self.base_dir, f"{name}_exec_{self.session_identifier}")
         self.config = config
         self.name = name
 
@@ -108,6 +109,7 @@ class AdvancedWandLogger(WandbLogger):
                  project: str = None,
                  version = None, 
                  offline = False,
+                 log_model = False,
                  **kwargs):
         
         name = f"{model._get_name()}#{session.session_identifier}"
@@ -115,7 +117,7 @@ class AdvancedWandLogger(WandbLogger):
         if project is None:
             project = f"{model._get_name()}_project"
         
-        super().__init__(name, save_dir, version, offline, None, None, None, project, "all", None, None, None, **kwargs)
+        super().__init__(name, save_dir, version, offline, None, None, None, project, log_model, None, None, None, **kwargs)
 
 class AdvancedModelCheckpoint(ModelCheckpoint):
 
