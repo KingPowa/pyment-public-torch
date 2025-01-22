@@ -5,9 +5,9 @@ from torch import Generator
 from torch.nn import Module
 from collections.abc import Iterable, Collection
 
-from datasets.file_based import MedicalDataset
-from datasets.mri import MRIDataset
-from utils.etc import is_iterable
+from ..datasets.file_based import MedicalDataset
+from ..datasets.mri import MRIDataset
+from ..utils.etc import is_iterable
 
 class MRIDataloader(LightningDataModule):
 

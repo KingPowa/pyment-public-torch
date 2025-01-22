@@ -5,8 +5,8 @@ import pickle
 from abc import abstractmethod
 from torch.utils.data import Dataset
 
-from configuration.files import LMDBDatasetConfig, NIFTIDatasetConfig, MedicalFileConfig
-from utils.etc import normalize_image
+from ..configuration.files import LMDBDatasetConfig, NIFTIDatasetConfig, MedicalFileConfig
+from ..utils.etc import normalize_image
     
 class MedicalDataset(Dataset):
 

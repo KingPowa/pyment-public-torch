@@ -30,6 +30,7 @@ class SFCN(BaseModel):
                  activation: Union[str, nn.Module] = 'relu',
                  filters: list[int] = FILTERS,
                  eps: float = 0.001,
+                 momentum: float = 0.1,
                  name: str = 'sfcn',
                  **kwargs):
         
@@ -39,6 +40,7 @@ class SFCN(BaseModel):
         self.name = name
         self.weight_decay = weight_decay
         self.eps = eps
+        self.momentum = momentum
 
         # Define layers
         channel_dict = OrderedDict()
@@ -68,7 +70,7 @@ class SFCN(BaseModel):
                     kernel_size=3,
                     bias=True
                 )
-            channel_dict[f'{block_name}_norm'] = nn.BatchNorm3d(out_channels, eps=self.eps)
+            channel_dict[f'{block_name}_norm'] = nn.BatchNorm3d(out_channels, eps=self.eps, momentum=self.momentum)
             channel_dict[f'{block_name}_{activation}'] = get_activation(activation)
             channel_dict[f'{block_name}_pool'] = MaxPool3dIndices(kernel_size=2, stride=2)
 

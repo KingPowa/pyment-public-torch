@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from torch.nn import Module
 import torchvision.transforms as tf
 
-from utils.etc import is_iterable
+from .etc import is_iterable
 
 class Nop(Callable):
     def __call__(self, x: np.ndarray):

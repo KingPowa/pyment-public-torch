@@ -15,14 +15,15 @@ from pytorch_lightning.strategies import DDPStrategy
 from pytorch_lightning.tuner import Tuner
 from pytorch_lightning.callbacks import EarlyStopping
 
-from utils.transforms import Resize3D
-from utils.sbatch_utils import query_lr
-from utils.logging_tools import setup_logger, Session, AdvancedModelCheckpoint, AdvancedWandLogger
-from datasets.utils import instantiate_datasets
-from dataloaders.mri import MRIHoldoutDataLoader
+from pyment.utils.transforms import Resize3D
+from pyment.utils.sbatch_utils import query_lr
+from pyment.utils.logging_tools import setup_logger, Session, AdvancedModelCheckpoint, AdvancedWandLogger
+from pyment.utils.optimize import Optimizer, OptimizerConfiguration, instantiate_optim_config
+from pyment.datasets.utils import instantiate_datasets
+from pyment.dataloaders.mri import MRIHoldoutDataLoader
 
-from model.trainable_sfcn import SFCNModule
-from model.sfcn_reg import RegressionSFCN
+from pyment.model.trainable_sfcn import SFCNModule
+from pyment.model.sfcn_reg import RegressionSFCN
 
 def main(config_file: str):
     # Constants
@@ -40,8 +41,77 @@ def main(config_file: str):
     datasets = instantiate_datasets(config.datasets, logger)
     dataloader = MRIHoldoutDataLoader(dataset=datasets, 
                                        batch_size=config.train_config.batch_size,
-                                       num_workers=config.train_config.num_workers,
+                                       num_workers=config.slurm_config.num_workers,
                                        transforms=[Resize3D(IMG_SHAPE, "trilinear")]) 
+    # Setup optimiziation
+    logger.info(f"Setting up optimizer configurations...")
+
+    optimizer_config = instantiate_optim_config(config)
+    logger.info("Optimizer run description:")
+    for part, part_config in optimizer_config.items():
+        logger.info(f"-- SECTION: {part}")
+        for param, descr in part_config.describe():
+            logger.info(f"-- Param: {param} - {descr}")
+            
+    logger.info(f"Starting training and model arguments")
+    logger.info(f"Number of epochs: {config.train_config.epochs}")
+    logger.info(f"Setting up Wandbboard")
+    wand_logger = AdvancedWandLogger(model, session)
+    checkpoint_callback = AdvancedModelCheckpoint(session=session,
+                                            filename_suffix='holdout',
+                                            monitor='val_loss',
+                                            mode='min')
+    early_stop_callback = EarlyStopping(
+        monitor='val_loss',
+        patience=config.trainable_config.patience,           # Number of epochs with no improvement after which training will be stopped
+        verbose=True,
+        mode='min'
+    )
+        
+    # Model Arguments
+    model_args = {
+        "prediction_range": AGE_RANGE
+    }
+    trainer_args = {
+        "accelerator" : session.accelerator,
+        "devices" : torch.cuda.device_count(),  # Automatically detect available GPUs
+        "num_nodes" : session.config.train_config.num_nodes,  # Number of nodes
+        "max_epochs" : session.config.train_config.epochs,
+        "strategy" : DDPStrategy(find_unused_parameters=False),
+        "logger" : wand_logger,
+        "enable_progress_bar" : (not session.is_slurm())
+    }
+    trainable_args = {
+        "pers_logger" : logger,
+        "learning_rate" : config.trainable_config.lr,
+        "momentum" : config.trainable_config.momentum,
+        "milestones" : config.trainable_config.milestones,
+        "weight_decay" : config.trainable_config.weight_decay
+    }
+
+    # Optimzer
+    optimizer = Optimizer(
+        trainer_args=trainer_args,
+        model_args=model_args,
+        trainable_args=trainable_args,
+        model_class=RegressionSFCN,
+        datamodule=dataloader,
+        config=optimizer_config,
+        logger=logger,
+        monitor_metric=config.trainable_config.monitor_metric,
+        callbacks=[checkpoint_callback, early_stop_callback]
+    )
+
+    logger.info("Starting optimizer...")
+    logger.info(f"TRAINING INFO")
+    logger.info(f"-- Devices {torch.cuda.device_count()}")
+    logger.info(f"-- Slurm {session.is_slurm()}")
+    logger.info(f"-- Accelerator {session.accelerator}")
+
+    optimizer.optimize(
+        
+    )
+
     # Setup Model
     logger.info(f"Declaring SFCN model...")
 
@@ -53,23 +123,11 @@ def main(config_file: str):
         logger.info(f"Using default learning rate passed from config: {config.train_config.lr}")
         lr = config.train_config.lr
 
-    model = SFCNModule(RegressionSFCN(prediction_range=AGE_RANGE), learning_rate=lr, pers_logger=logger,
-                       milestones=config.train_config.milestones, decay=config.train_config.decay,
-                       max_epochs=session.config.train_config.epochs)
+    model = SFCNModule(RegressionSFCN(prediction_range=AGE_RANGE),
+                       learning_rate=lr, 
+                       pers_logger=logger)
     # Setup Training
-    logger.info(f"Starting training. Number of epochs: {config.train_config.epochs}")
-    logger.info(f"Setting up Wandbboard")
-    wand_logger = AdvancedWandLogger(model, session)
-    checkpoint_callback = AdvancedModelCheckpoint(session=session,
-                                            filename_suffix='holdout',
-                                            monitor='val_loss',
-                                            mode='min')
-    early_stop_callback = EarlyStopping(
-        monitor='val_loss',
-        patience=config.train_config.patience,           # Number of epochs with no improvement after which training will be stopped
-        verbose=True,
-        mode='min'
-    )
+    
     logger.info(f"Setting up Trainer")
     logger.info(f"TRAINING INFO")
     logger.info(f"-- Devices {torch.cuda.device_count()}")

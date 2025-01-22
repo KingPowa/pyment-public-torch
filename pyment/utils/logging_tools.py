@@ -5,7 +5,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.utilities import rank_zero_only
 from omegaconf import DictConfig
 
-from utils.etc import get_timestamp
+from .etc import get_timestamp
 
 class Session:
 

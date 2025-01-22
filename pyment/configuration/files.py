@@ -4,8 +4,8 @@ from torchvision import transforms
 from collections.abc import Collection, Callable
 from typing import Optional
 
-from utils.transforms import Nop, Compose
-from utils.filetypes import SourceFile
+from ..utils.transforms import Nop, Compose
+from ..utils.filetypes import SourceFile
 
 class MedicalFileConfig:
 

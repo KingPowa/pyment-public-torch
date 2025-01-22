@@ -7,7 +7,16 @@ from logging import Logger
 from .sfcn import SFCN
 
 class SFCNModule(pl.LightningModule):
-    def __init__(self, model: SFCN, learning_rate=0.1, optimizer = "sgd", criterion = nn.MSELoss(), pers_logger: Logger = None, max_epochs = 80, decay = 1/3, milestones = 5):
+    def __init__(self, model: SFCN, 
+                 optimizer = "sgd", 
+                 criterion = nn.MSELoss(), 
+                 max_epochs = 80, 
+                 decay = 1/3, 
+                 milestones = [20,40,60],
+                 lr = 0.1,
+                 weight_decay = 0,
+                 momentum = 0,
+                 pers_logger: Logger = None):
         """
         PyTorch Lightning module to train SFCN
         
@@ -17,13 +26,9 @@ class SFCNModule(pl.LightningModule):
         """
         super().__init__()
         self.model = model
-        self.learning_rate = learning_rate
         self.criterion = criterion
         self.optimizer = optimizer
         self.pers_logger = pers_logger
-        self.max_epochs = max_epochs
-        self.decay = decay
-        self.milestones = milestones
         self.save_hyperparameters(ignore=["model", "criterion", "pers_logger"])
 
     def forward(self, x):
@@ -66,18 +71,20 @@ class SFCNModule(pl.LightningModule):
         for handler in self.pers_logger.handlers:
             handler.flush()
 
-
     def __get_opt(self, opt):
-        if opt == "sgd": return optim.SGD(self.model.parameters(), lr=self.hparams.learning_rate)
+        if opt == "sgd": return optim.SGD(self.model.parameters(), 
+                                          lr=self.hparams.lr,
+                                          weight_decay=self.hparams.weight_decay,
+                                          momentum=self.hparams.momentum)
         else: raise NotImplementedError(f"Optimizer {opt} not supported.")
 
     def configure_optimizers(self):
         """
         Configure SGD optimizer with a step-wise learning rate schedule.
-        - Initial learning rate: self.learning_rate
+        - Initial learning rate: self.lr
         - Step-wise reduction by factor of 3 at epochs [20, 40, 60]
         """
         optimizer = self.__get_opt(self.hparams.optimizer)
-        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[i * (self.max_epochs // self.milestones) for i in range(1, self.milestones+1)], gamma=self.decay)
+        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=self.hparams.milestones, gamma=self.hparams.decay)
 
         return {"optimizer": optimizer, "lr_scheduler": scheduler}

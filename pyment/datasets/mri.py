@@ -6,7 +6,7 @@ from torchvision import transforms as tr
 from typing import Optional, Collection
 
 from .file_based import MedicalDataset
-from utils.etc import is_iterable
+from ..utils.etc import is_iterable
     
 class MRIDataset(Dataset):
 

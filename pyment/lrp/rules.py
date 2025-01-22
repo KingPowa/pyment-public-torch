@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from copy import deepcopy
 
 from captum.attr._utils.lrp_rules import PropagationRule
-from model.utils.nn_utils import MaxPool3dIndices
+from ..model.utils.nn_utils import MaxPool3dIndices
 
 class WinnerTakesAll(PropagationRule):
     """
