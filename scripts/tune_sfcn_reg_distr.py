@@ -10,15 +10,11 @@ parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
 
 from omegaconf import OmegaConf
-from pytorch_lightning import Trainer
 from pytorch_lightning.strategies import DDPStrategy
-from pytorch_lightning.tuner import Tuner
-from pytorch_lightning.callbacks import EarlyStopping
 
 from pyment.utils.transforms import Resize3D
-from pyment.utils.sbatch_utils import query_lr
-from pyment.utils.logging_tools import setup_logger, Session, AdvancedModelCheckpoint, AdvancedWandLogger
-from pyment.utils.optimize import Optimizer, OptimizerConfiguration, instantiate_optim_config
+from pyment.utils.logging_tools import setup_logger, Session
+from pyment.utils.optimize import Optimizer, instantiate_optim_config
 from pyment.datasets.utils import instantiate_datasets
 from pyment.dataloaders.mri import MRIHoldoutDataLoader
 
@@ -56,17 +52,6 @@ def main(config_file: str):
     logger.info(f"Starting training and model arguments")
     logger.info(f"Number of epochs: {config.train_config.epochs}")
     logger.info(f"Setting up Wandbboard")
-    wand_logger = AdvancedWandLogger(model, session)
-    checkpoint_callback = AdvancedModelCheckpoint(session=session,
-                                            filename_suffix='holdout',
-                                            monitor='val_loss',
-                                            mode='min')
-    early_stop_callback = EarlyStopping(
-        monitor='val_loss',
-        patience=config.trainable_config.patience,           # Number of epochs with no improvement after which training will be stopped
-        verbose=True,
-        mode='min'
-    )
         
     # Model Arguments
     model_args = {
@@ -78,7 +63,6 @@ def main(config_file: str):
         "num_nodes" : session.config.train_config.num_nodes,  # Number of nodes
         "max_epochs" : session.config.train_config.epochs,
         "strategy" : DDPStrategy(find_unused_parameters=False),
-        "logger" : wand_logger,
         "enable_progress_bar" : (not session.is_slurm())
     }
     trainable_args = {
@@ -91,6 +75,7 @@ def main(config_file: str):
 
     # Optimzer
     optimizer = Optimizer(
+        session=session,
         trainer_args=trainer_args,
         model_args=model_args,
         trainable_args=trainable_args,
@@ -98,8 +83,8 @@ def main(config_file: str):
         datamodule=dataloader,
         config=optimizer_config,
         logger=logger,
-        monitor_metric=config.trainable_config.monitor_metric,
-        callbacks=[checkpoint_callback, early_stop_callback]
+        monitor_metric=config.optuna_config.monitor_metric,
+        callbacks=[]
     )
 
     logger.info("Starting optimizer...")
@@ -109,51 +94,13 @@ def main(config_file: str):
     logger.info(f"-- Accelerator {session.accelerator}")
 
     optimizer.optimize(
-        
+        n_trials = config.optuna_config.n_trials
     )
-
-    # Setup Model
-    logger.info(f"Declaring SFCN model...")
-
-    # Querying LR from env
-    lr = query_lr()
-    if lr is not None:
-        logger.info(f"Learning rate passed from env: {lr}")
-    else:
-        logger.info(f"Using default learning rate passed from config: {config.train_config.lr}")
-        lr = config.train_config.lr
-
-    model = SFCNModule(RegressionSFCN(prediction_range=AGE_RANGE),
-                       learning_rate=lr, 
-                       pers_logger=logger)
-    # Setup Training
-    
-    logger.info(f"Setting up Trainer")
-    logger.info(f"TRAINING INFO")
-    logger.info(f"-- Devices {torch.cuda.device_count()}")
-    logger.info(f"-- Slurm {session.is_slurm()}")
-    logger.info(f"-- Accelerator {session.accelerator}")
-    trainer = Trainer(
-        accelerator=session.accelerator,
-        devices=torch.cuda.device_count(),  # Automatically detect available GPUs
-        num_nodes=session.config.train_config.num_nodes,  # Number of nodes
-        max_epochs=session.config.train_config.epochs,
-        strategy=DDPStrategy(find_unused_parameters=False),
-        logger=wand_logger,
-        callbacks=[checkpoint_callback, early_stop_callback],
-        enable_progress_bar=(not session.is_slurm())
-    )
-
-    logger.info(f"Starting trainer")
-    trainer.fit(model, datamodule=dataloader)
-
-    performances = trainer.callback_metrics
-    logger.info(f"Finished. Total performance: {performances}")
 
 if __name__ == "__main__":
     # Check if the parameter is passed
     if len(sys.argv) != 2:
-        print("Usage: python train_sfcn_reg_distr.py")
+        print("Usage: python tune_sfcn_reg_distr.py")
         sys.exit(1)
 
     # Retrieve the parameter from the command line

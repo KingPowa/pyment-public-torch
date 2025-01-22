@@ -12,7 +12,7 @@ from hydra.utils import instantiate
 from pytorch_lightning import Trainer, LightningModule, LightningDataModule
 from pytorch_lightning.callbacks import Callback
 
-from .logging_tools import RankZeroLogger
+from .logging_tools import RankZeroLogger, Session, AdvancedModelCheckpoint, AdvancedWandLogger
 from ..model.sfcn import SFCN
 from ..model.trainable_sfcn import SFCNModule
 
@@ -126,12 +126,13 @@ class OptimizerConfiguration:
 def instantiate_optim_config(config: DictConfig) -> dict[str, OptimizerConfiguration]:
     return {
         key: instantiate(elem) for key, elem in config.optuna_config.items() 
-        if isinstance(elem, OptimizerConfiguration) 
+        if ("_target_" in elem and "OptimizerConfiguration" in elem._target_)
     }
 
 class Optimizer():
 
     def __init__(self,
+                 session: Session,
                  trainer_args: dict[str, Any],
                  model_class: Type[SFCN],
                  model_args: dict[str, Any],
@@ -151,6 +152,7 @@ class Optimizer():
         self.monitor_metric = monitor_metric,
         self.callbacks = callbacks
         self.model_class = model_class
+        self.session = session
 
     def __register_parameters(arg_dict: dict[str, Any], 
                               suggested_parameters: dict[str, dict[str, Any]], 
@@ -181,11 +183,32 @@ class Optimizer():
             self.__register_parameters(trainer_args, suggested_parameters, "trainer")
             self.__register_parameters(trainable_args, suggested_parameters, "trainable")
 
-            callbacks = self.callbacks + [PyTorchLightningPruningCallback(trial, monitor=self.monitor_metric)]
+            # Create a new session
+            trial_session = Session(f"Trial_{trial.number}_{self.session.name}",
+                                    config = {
+                                        "train_config": {
+                                            "base_dir": self.session.working_directory
+                                        }
+                                    })
+
+            wand_logger = AdvancedWandLogger(model, trial_session, offline=True)
+
+            checkpoint_callback = AdvancedModelCheckpoint(session=trial_session,
+                                            filename_suffix='holdout',
+                                            monitor='val_loss',
+                                            mode='min')
+            
+            pruning_callback = PyTorchLightningPruningCallback(trial, 
+                                                    monitor=self.monitor_metric)
+
+            callbacks = self.callbacks + [pruning_callback,
+                                          checkpoint_callback]
 
             model: SFCN = self.model_class(**model_args)
             trainable: SFCNModule = SFCNModule(model=model, **trainable_args) 
-            trainer = Trainer(callbacks=callbacks, **trainer_args)
+            trainer = Trainer(callbacks=callbacks, 
+                              logger=wand_logger,
+                              **trainer_args)
             trainer.logger.log_hyperparams(suggested_parameters)
 
             self.logger.info(f"Starting trainer for trial")
