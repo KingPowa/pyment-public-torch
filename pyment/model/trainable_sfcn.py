@@ -29,7 +29,7 @@ class SFCNModule(pl.LightningModule):
         self.criterion = criterion
         self.optimizer = optimizer
         self.pers_logger = pers_logger
-        self.save_hyperparameters(ignore=["model", "criterion", "pers_logger"])
+        self.save_hyperparameters(ignore=["criterion", "pers_logger"])
 
     def forward(self, x):
         return self.model(x)
