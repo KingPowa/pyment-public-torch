@@ -14,14 +14,14 @@ from pytorch_lightning.strategies import DDPStrategy
 from pytorch_lightning.tuner import Tuner
 from pytorch_lightning.callbacks import EarlyStopping
 
-from utils.transforms import Resize3D
-from utils.sbatch_utils import query_lr
-from utils.logging_tools import setup_logger, Session, AdvancedModelCheckpoint, AdvancedWandLogger
-from datasets.utils import instantiate_datasets
-from dataloaders.mri import MRIHoldoutDataLoader
+from pyment.utils.transforms import Resize3D
+from pyment.utils.sbatch_utils import query_lr
+from pyment.utils.logging_tools import setup_logger, Session, AdvancedModelCheckpoint, AdvancedWandLogger
+from pyment.datasets.utils import instantiate_datasets
+from pyment.dataloaders.mri import MRIHoldoutDataLoader
 
-from model.trainable_sfcn import SFCNModule
-from model.sfcn_reg import RegressionSFCN
+from pyment.model.trainable_sfcn import SFCNModule
+from pyment.model.sfcn_reg import RegressionSFCN
 
 def main(config_file: str):
     # Constants
