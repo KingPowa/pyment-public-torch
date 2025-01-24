@@ -7,7 +7,7 @@ from logging import Logger
 from .sfcn import SFCN
 
 class SFCNModule(pl.LightningModule):
-    def __init__(self, eff_model: SFCN, 
+    def __init__(self, model: SFCN, 
                  optimizer = "sgd", 
                  criterion = nn.MSELoss(), 
                  max_epochs = 80, 
@@ -25,32 +25,32 @@ class SFCNModule(pl.LightningModule):
             learning_rate (float): Initial learning rate for SGD (default: 0.1).
         """
         super().__init__()
-        self.eff_model = eff_model
+        self.model = model
         self.criterion = criterion
         self.optimizer = optimizer
         self.pers_logger = pers_logger
         self.save_hyperparameters(ignore=["criterion", "pers_logger"])
 
     def forward(self, x):
-        return self.eff_model(x)
+        return self.model(x)
 
     def training_step(self, batch, batch_idx):
         img, cond = batch
-        predicted_age = self.eff_model(img)
+        predicted_age = self.model(img)
         loss = self.criterion(predicted_age, cond[:, 0].unsqueeze(1))
         self.log("train_loss", loss, prog_bar=True, on_epoch=True, sync_dist=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
         img, cond = batch
-        predicted_age = self.eff_model(img)
+        predicted_age = self.model(img)
         loss = self.criterion(predicted_age, cond[:, 0].unsqueeze(1))
         self.log("val_loss", loss, prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
         return loss
 
     def test_step(self, batch, batch_idx):
         img, cond = batch
-        predicted_age = self.eff_model(img)
+        predicted_age = self.model(img)
         loss = self.criterion(predicted_age, cond[:, 0].unsqueeze(1))
         self.log("test_loss", loss, prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
         return loss
@@ -72,7 +72,7 @@ class SFCNModule(pl.LightningModule):
             handler.flush()
 
     def __get_opt(self, opt):
-        if opt == "sgd": return optim.SGD(self.eff_model.parameters(), 
+        if opt == "sgd": return optim.SGD(self.model.parameters(), 
                                           lr=self.hparams.lr,
                                           weight_decay=self.hparams.weight_decay,
                                           momentum=self.hparams.momentum)
