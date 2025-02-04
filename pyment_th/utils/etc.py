@@ -2,7 +2,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 import numpy as np
-from typing import Tuple
+from typing import Tuple, Union
 from collections.abc import Collection
 from datetime import datetime
 
@@ -10,9 +10,9 @@ def get_timestamp():
     return datetime.timestamp(datetime.now())
 
 def calculate_output_shape(input_shape: Collection[int], 
-                           kernel_size: int | Tuple[int, int], 
-                           stride: int | Tuple[int, int]=1, 
-                           padding: int | Tuple[int, int]=0, 
+                           kernel_size: Union[int, Tuple[int, int]], 
+                           stride: Union[int, Tuple[int, int]]=1, 
+                           padding: Union[int, Tuple[int, int]]=0, 
                            dilation: int =1, out_channels: int =None):
     """
     Calculate the output shape after a convolutional layer.

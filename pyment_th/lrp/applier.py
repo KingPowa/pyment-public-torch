@@ -1,10 +1,10 @@
 from .parametrize import BNParametrizer
 from captum.attr._utils.lrp_rules import PropagationRule, EpsilonRule
-from captum.attr._core.lrp import SUPPORTED_LAYERS_WITH_RULES, LRP
+from captum.attr._core.lrp import SUPPORTED_LAYERS_WITH_RULES, SUPPORTED_NON_LINEAR_LAYERS, LRP
 import torch.nn as nn
 import torch
 from copy import deepcopy
-from typing import List, TypeVar, Tuple
+from typing import List, TypeVar, Tuple, Union
 from collections import OrderedDict
 
 from .utils import contains_bn, expand_model, is_activation, is_batchnorm
@@ -15,7 +15,7 @@ class LRPApplier:
 
     # https://iphome.hhi.de/samek/pdf/LetSPM22.pdf
 
-    def __init__(self, model: TorchModel, rules: OrderedDict[str, PropagationRule] | List[PropagationRule]):
+    def __init__(self, model: TorchModel, rules: Union[OrderedDict[str, PropagationRule], List[PropagationRule]]):
         self.model = self.__prepare_model(model)
         self.rules = self.__prepare_rules(rules)
         self.apply_rules()
@@ -27,7 +27,7 @@ class LRPApplier:
                 continue
         return rules
 
-    def __validate_rules(self, rules: OrderedDict[str, PropagationRule] | List[PropagationRule]) -> OrderedDict[str, PropagationRule]:
+    def __validate_rules(self, rules: Union[OrderedDict[str, PropagationRule], List[PropagationRule]]) -> OrderedDict[str, PropagationRule]:
         keys = list(self.layers.keys())
 
         if rules is None: return OrderedDict()
@@ -56,13 +56,14 @@ class LRPApplier:
 
         return new_model
     
-    def __prepare_rules(self, rules: OrderedDict[str, PropagationRule] | List[PropagationRule]) -> OrderedDict[str, PropagationRule]:
+    def __prepare_rules(self, rules: Union[OrderedDict[str, PropagationRule], List[PropagationRule]]) -> OrderedDict[str, PropagationRule]:
         self.layers = {elem[0]: elem[1] for elem in expand_model(self.model.named_children()) if not (is_activation(elem[1]) or isinstance(elem[1], nn.Dropout))}
+        SUPPORTED_NON_LINEAR_LAYERS.append(nn.Sigmoid)
         rules = self.__validate_rules(rules)
         rules = self.__complete_rules(rules)
         return rules
     
-    def set_rules(self, rules: OrderedDict[str, PropagationRule] | List[PropagationRule]):
+    def set_rules(self, rules: Union[OrderedDict[str, PropagationRule], List[PropagationRule]]):
 
         self.rules = self.__prepare_rules(rules)
     

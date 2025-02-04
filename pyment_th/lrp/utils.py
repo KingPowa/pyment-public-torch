@@ -86,7 +86,7 @@ def get_layer_copy(module: nn.Module) -> nn.Module:
     new_module.zero_grad()
     return new_module
 
-def get_conv_args(conv: Conv1Class | Conv2Class | Conv3Class) -> Dict[str, Any]:
+def get_conv_args(conv: Union[Conv1Class, Conv2Class, Conv3Class]) -> Dict[str, Any]:
     conv_class = conv.__class__  
     init_signature = inspect.signature(conv_class.__init__)
     init_params = init_signature.parameters

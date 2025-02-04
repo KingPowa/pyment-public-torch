@@ -15,6 +15,14 @@ from collections import OrderedDict
 DATA_DIR = os.path.join(os.getcwd(), '.pyment')
 MODELS_DIR = os.path.join(DATA_DIR, 'models')
 
+SPECIAL_MODEL_EXCEPTION = {
+    ("sfcn-bin", "Regression3DSFCN") : [{"predictions" : "dense_3"}, 
+                                        {"dense_3/bias:0": {"name" : "linear.sfcn-bin_predictions.bias",
+                                                            "value" : lambda tf_value: torch.tensor(tf_value, dtype=torch.float32)},
+                                         "dense_3/kernel:0": {"name" : "linear.sfcn-bin_predictions.weight",
+                                                              "value" : lambda tf_value: torch.tensor(tf_value.transpose(1, 0), dtype=torch.float32)}}]
+}
+
 try:
     METADATA_DIR = pkg_resources.files('pyment').joinpath('data')
 except:
@@ -105,22 +113,32 @@ class WeightRepository:
 
     @staticmethod
     def convert_to_torch(weights_path: str, model_state_dictionary: dict, model_type: str = "sfcn-reg", model_name: str = "Regression3DSFCN") -> OrderedDict[str, np.ndarray]:
-        weight_dictionary = WeightRepository.load_tf_weights(weights_path, model_name)
+        
+        if (model_type, model_name) in SPECIAL_MODEL_EXCEPTION:
+            model_exceptions_load, model_exceptions_transl = SPECIAL_MODEL_EXCEPTION[(model_type, model_name)]
+        else:
+            model_exceptions_load, model_exceptions_transl = {}, {}
+        
+        weight_dictionary = WeightRepository.load_tf_weights(weights_path, model_name, model_exceptions=model_exceptions_load)
         # Translate it
 
         weight_dictionary = WeightRepository.__translate_tf_weights(tf_weights=weight_dictionary, state_dictionary=model_state_dictionary,
-                                                                    model_type=model_type, model_name=model_name)
+                                                                    model_type=model_type, model_name=model_name, model_exceptions=model_exceptions_transl)
         return weight_dictionary
 
 
     @staticmethod
-    def load_tf_weights(weights_path: str, model_name: str = "Regression3DSFCN") -> OrderedDict[str, np.ndarray]:
+    def load_tf_weights(weights_path: str, model_name: str = "Regression3DSFCN", model_exceptions: dict = {}) -> OrderedDict[str, np.ndarray]:
         ordering = {
             "conv": ("kernel:0", "bias:0"),
             "norm": ("gamma:0", "beta:0", "moving_mean:0", "moving_variance:0"),
             "predictions": ("kernel:0", "bias:0"),
             f"{model_name}": ('block1', 'block2', 'block3', 'block4', 'block5', 'expand_dims', 'inputs', 'restrict', 'top', 'predictions')
         }
+
+        for key, value in model_exceptions.items():
+            if key in ordering:
+                ordering[value] = ordering[key]
 
         def order_key(lst, main_key, ordering):
             lst = list(lst)
@@ -159,40 +177,45 @@ class WeightRepository:
         return tf_weights
     
     @staticmethod
-    def __translate_tf_weights(tf_weights: dict, state_dictionary: dict, model_type: str = "sfcn-reg", model_name: str = 'Regression3DSFCN') -> OrderedDict[str, np.ndarray]:
+    def __translate_tf_weights(tf_weights: dict, state_dictionary: dict, model_type: str = "sfcn-reg", model_name: str = 'Regression3DSFCN', model_exceptions = {}) -> OrderedDict[str, np.ndarray]:
+        pred_key = 'predictions'
+        
         new_weight_dict = OrderedDict()
         with torch.no_grad():
             for tf_key, tf_value in tf_weights.items():
                 pt_key = model_name + tf_key.split(model_name)[-1]
-                if "kernel:0" in tf_key:
+                if tf_key in model_exceptions:
+                    name, fn_translation = model_exceptions[tf_key]['name'], model_exceptions[tf_key]['value']
+                    new_weight_dict[name] = fn_translation(tf_value)
+                elif "kernel:0" in tf_key:
                     # Convert convolutional weights (NHWC -> NCHW)
-                    if 'prediction' in tf_key:
-                        pt_key = pt_key.replace("/", "_").replace("Regression3DSFCN_", f"linear.{model_type}_").replace("_kernel:0", ".weight")
+                    if pred_key in tf_key:
+                        pt_key = pt_key.replace("/", "_").replace(f"{model_name}_", f"linear.{model_type}_").replace("_kernel:0", ".weight")
                         new_weight_dict[pt_key] = torch.tensor(tf_value.transpose(1, 0), dtype=torch.float32)
                     else:
-                        pt_key = pt_key.replace("/", "_").replace("Regression3DSFCN_", f"fn1.{model_type}_").replace("_kernel:0", ".weight")
+                        pt_key = pt_key.replace("/", "_").replace(f"{model_name}_", f"fn1.{model_type}_").replace("_kernel:0", ".weight")
                         new_weight_dict[pt_key] = torch.tensor(tf_value.transpose(4, 3, 0, 1, 2), dtype=torch.float32)
                 elif "bias:0" in pt_key:
                     # Convert biases
-                    if 'prediction' in tf_key:
-                        pt_key = pt_key.replace("/", "_").replace("Regression3DSFCN_", f"linear.{model_type}_").replace("_bias:0", ".bias")
+                    if pred_key in tf_key:
+                        pt_key = pt_key.replace("/", "_").replace(f"{model_name}_", f"linear.{model_type}_").replace("_bias:0", ".bias")
                     else:
-                        pt_key = pt_key.replace("/", "_").replace("Regression3DSFCN_", f"fn1.{model_type}_").replace("_bias:0", ".bias")
+                        pt_key = pt_key.replace("/", "_").replace(f"{model_name}_", f"fn1.{model_type}_").replace("_bias:0", ".bias")
                     new_weight_dict[pt_key] = torch.tensor(tf_value, dtype=torch.float32)
                 elif "gamma:0" in pt_key:
                     # BatchNorm weight
-                    pt_key = pt_key.replace("/", "_").replace("Regression3DSFCN_", f"fn1.{model_type}_").replace("_gamma:0", ".weight")
+                    pt_key = pt_key.replace("/", "_").replace(f"{model_name}_", f"fn1.{model_type}_").replace("_gamma:0", ".weight")
                     new_weight_dict[pt_key] = torch.tensor(tf_value, dtype=torch.float32)
                 elif "beta:0" in pt_key:
                     # BatchNorm bias
-                    pt_key = pt_key.replace("/", "_").replace("Regression3DSFCN_", f"fn1.{model_type}_").replace("_beta:0", ".bias")
+                    pt_key = pt_key.replace("/", "_").replace(f"{model_name}_", f"fn1.{model_type}_").replace("_beta:0", ".bias")
                     new_weight_dict[pt_key] = torch.tensor(tf_value, dtype=torch.float32)
                 elif "moving_mean:0" in pt_key:
                     # BatchNorm running mean
-                    pt_key = pt_key.replace("/", "_").replace("Regression3DSFCN_", f"fn1.{model_type}_").replace("_moving_mean:0", ".running_mean")
+                    pt_key = pt_key.replace("/", "_").replace(f"{model_name}_", f"fn1.{model_type}_").replace("_moving_mean:0", ".running_mean")
                     new_weight_dict[pt_key] = torch.tensor(tf_value, dtype=torch.float32)
                 elif "moving_variance:0" in pt_key:
                     # BatchNorm running variance
-                    pt_key = pt_key.replace("/", "_").replace("Regression3DSFCN_", f"fn1.{model_type}_").replace("_moving_variance:0", ".running_var")
+                    pt_key = pt_key.replace("/", "_").replace(f"{model_name}_", f"fn1.{model_type}_").replace("_moving_variance:0", ".running_var")
                     new_weight_dict[pt_key] = torch.tensor(tf_value, dtype=torch.float32)
             return OrderedDict({k: new_weight_dict[k] for k in state_dictionary.keys() if "num_batches_tracked" not in k})

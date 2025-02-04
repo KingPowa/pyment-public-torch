@@ -2,7 +2,7 @@ import torch.nn as nn
 import torch
 import copy
 
-from typing import TypeVar, Any
+from typing import TypeVar, Any, Union
 
 TorchModel = TypeVar('T', bound=nn.Module)
 Conv1Class = TypeVar('C1', bound=nn.Conv1d)
@@ -19,7 +19,7 @@ class BNParametrizer:
         self.keep_original = keep_original
     
     @staticmethod
-    def fuse_bn_with_linear(fc: nn.Linear, bn: nn.BatchNorm1d | nn.BatchNorm2d | nn.BatchNorm3d, is_before: bool = True):
+    def fuse_bn_with_linear(fc: nn.Linear, bn: Union[nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d], is_before: bool = True):
         """
         Fuse a BatchNorm layer into a fully connected (nn.Linear) layer.
         """
@@ -48,7 +48,7 @@ class BNParametrizer:
         return new_fc
 
     @staticmethod
-    def fuse_bn_with_conv(conv: Conv1Class | Conv2Class | Conv3Class, bn: nn.BatchNorm1d | nn.BatchNorm2d | nn.BatchNorm3d, is_before: bool = True):
+    def fuse_bn_with_conv(conv: Union[Conv1Class, Conv2Class, Conv3Class], bn: Union[nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d], is_before: bool = True):
         """
         Fuse a BatchNorm layer into a convolutional layer.
         """
